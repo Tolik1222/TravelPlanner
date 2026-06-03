@@ -1,6 +1,17 @@
 version: '3.8'
 
 services:
+  db:
+    image: postgres:15-alpine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=travel_planner
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    ports:
+      - "5432:5432"
+
   web:
     build: .
     ports:
@@ -9,6 +20,24 @@ services:
       - .:/app
     environment:
       - PYTHONUNBUFFERED=1
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=travel_planner
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+    depends_on:
+      - db
     command: >
-      sh -c "python manage.py migrate &&
-             python manage.py runserver 0.0.0.0:8000"
+      sh -c "python -c \"
+import socket, time
+while True:
+    try:
+        with socket.create_connection(('db', 5432), timeout=1):
+            break
+    except OSError:
+        print('Waiting for postgres...')
+        time.sleep(1)
+\" && python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
+
+volumes:
+  postgres_data:
